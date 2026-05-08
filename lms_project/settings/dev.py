@@ -15,7 +15,14 @@ DEBUG = True
 # secrets only matter in prod.
 SECRET_KEY = _BASE_SECRET_KEY or 'django-insecure-dev-only-key-do-not-use-in-production'
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'backend', 'testserver']
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.environ.get(
+        'ALLOWED_HOSTS',
+        'localhost,127.0.0.1,backend,testserver',
+    ).split(',')
+    if host.strip()
+]
 
 CORS_ALLOWED_ORIGINS = [
     origin.strip()

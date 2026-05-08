@@ -4,9 +4,15 @@ Loaded automatically by `wsgi.py` / `asgi.py` so Heroku and any other
 WSGI host gets the hardened config without needing to set
 `DJANGO_SETTINGS_MODULE` explicitly (though doing so is still recommended).
 
-Required environment variables: `SECRET_KEY`, `ALLOWED_HOSTS`,
-`CORS_ALLOWED_ORIGINS`. Missing any of these will raise at import time so
-a misconfigured deploy fails fast instead of silently running insecurely.
+Required environment variables: `SECRET_KEY` and `ALLOWED_HOSTS`. Both
+fail fast at import time if missing — better to refuse to boot than to
+serve traffic with an insecure SECRET_KEY or accept arbitrary Host
+headers.
+
+`CORS_ALLOWED_ORIGINS` is recommended but not enforced. An empty value
+means the API rejects every cross-origin request, which fails visibly
+the moment the frontend tries to reach it (so silent insecurity is not a
+risk here).
 """
 
 import os
