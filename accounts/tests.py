@@ -171,3 +171,34 @@ class UserManagementTests(TestCase):
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.student_token.key}')
         response = self.client.delete(f'/api/users/{self.admin.id}/')
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class LogoutTests(TestCase):
+    """Tests for POST /api/auth/logout/.
+
+    Logout works by destroying the user's auth token server-side. After
+    logout, the same token must no longer authenticate any request — this
+    is what makes the endpoint a real security primitive rather than a
+    client-only convenience.
+    """
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username='testuser', email='test@example.com',
+            password='testpass123', role='student',
+        )
+        self.token = Token.objects.create(user=self.user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+
+    def test_logout_deletes_token_and_returns_204(self):
+        """Logout must destroy the token row so reuse is impossible."""
+        response = self.client.post('/api/auth/logout/')
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Token.objects.filter(key=self.token.key).exists())
+
+    def test_logout_then_reuse_token_is_unauthorized(self):
+        """The same token must stop working immediately after logout."""
+        self.client.post('/api/auth/logout/')
+        response = self.client.get('/api/auth/me/')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)

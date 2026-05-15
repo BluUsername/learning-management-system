@@ -19,6 +19,7 @@ from rest_framework import status
 from rest_framework.authtoken.models import Token
 
 from accounts.models import User
+from courses.models import Course, Enrollment
 from .models import ChatConversation, ChatMessage
 
 
@@ -298,3 +299,61 @@ class MessageCreateTests(TestCase):
         bot_content = response.data['assistant_message']['content']
         # Should mention browsing courses
         self.assertIn('All Courses', bot_content)
+
+    def test_bot_lists_actual_enrolled_courses_for_student(self):
+        """When a student asks "what are my courses?", the bot must read
+        their real enrolments out of the database — not a template.
+
+        This is the data-driven branch of the chatbot (as opposed to the
+        static keyword-matched branches), so the test creates a real
+        Enrollment and asserts the course title shows up in the reply.
+        """
+        teacher = User.objects.create_user(
+            username='teacher_bot', email='tb@example.com',
+            password='testpass123', role='teacher',
+        )
+        course = Course.objects.create(
+            title='Astrophysics 101', description='Stars and stuff',
+            teacher=teacher,
+        )
+        Enrollment.objects.create(student=self.student, course=course)
+
+        response = self.client.post(
+            f'/api/chat/conversations/{self.conversation.id}/messages/',
+            {'content': 'what are my enrolled courses?'},
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIn('Astrophysics 101', response.data['assistant_message']['content'])
+
+    def test_bot_blocks_student_asking_how_to_create_a_course(self):
+        """When a student asks "how do I create a course?", the bot must
+        explain that only teachers/admins can create courses — rather than
+        sending them down the teacher flow.
+
+        This tests the role-based branching inside the chatbot: the same
+        keyword pattern produces different responses depending on the user.
+        """
+        response = self.client.post(
+            f'/api/chat/conversations/{self.conversation.id}/messages/',
+            {'content': 'How do I create a new course?'},
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        bot_content = response.data['assistant_message']['content'].lower()
+        self.assertIn('teacher', bot_content)
+
+    def test_bot_falls_back_for_unrecognised_input(self):
+        """Messages that match no keyword pattern must still get a useful
+        reply — the fallback that points the user at things the bot can do.
+
+        Without this safety net, an unknown input would either crash or
+        produce a confusing empty response.
+        """
+        response = self.client.post(
+            f'/api/chat/conversations/{self.conversation.id}/messages/',
+            {'content': 'asdjklhfaweqwerxyz'},
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        bot_content = response.data['assistant_message']['content']
+        # The fallback advertises the things the bot CAN handle.
+        self.assertIn('Courses', bot_content)
+        self.assertIn('Profile', bot_content)

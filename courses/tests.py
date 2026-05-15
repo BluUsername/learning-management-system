@@ -190,6 +190,42 @@ class EnrollmentTests(TestCase):
         results = response.data.get('results', response.data)
         self.assertEqual(len(results), 1)
 
+    def test_enroll_nonexistent_course_returns_404(self):
+        """A student trying to enroll in a course that doesn't exist must
+        get a 404 — not a 500 — so the API stays a well-behaved REST citizen.
+        """
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.student_token.key}')
+        response = self.client.post('/api/courses/999999/enroll/')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_enroll_full_course_returns_400(self):
+        """When a course hits its max_students capacity, further enrolment
+        attempts must be rejected with a clear 400 instead of being silently
+        accepted (which would break the capacity contract).
+        """
+        full_course = Course.objects.create(
+            title='Tiny Cohort', description='Capacity of one.',
+            teacher=self.teacher, max_students=1,
+        )
+        first_student = User.objects.create_user(
+            username='first', email='first@example.com',
+            password='testpass123', role='student',
+        )
+        Enrollment.objects.create(student=first_student, course=full_course)
+
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.student_token.key}')
+        response = self.client.post(f'/api/courses/{full_course.id}/enroll/')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('full', response.data['detail'].lower())
+
+    def test_unenroll_when_not_enrolled_returns_404(self):
+        """Trying to leave a course the student was never in must 404 —
+        the resource (their enrolment) genuinely doesn't exist.
+        """
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.student_token.key}')
+        response = self.client.delete(f'/api/courses/{self.course.id}/unenroll/')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
 
 class AssignmentTests(TestCase):
     """Tests for assignment CRUD operations."""
@@ -451,3 +487,37 @@ class SubmissionTests(TestCase):
             format='json',
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_grade_submission_not_found_returns_404(self):
+        """Grading a submission that doesn't exist must 404, not 500."""
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.teacher_token.key}')
+        response = self.client.patch(
+            '/api/submissions/999999/grade/',
+            {'grade': 50, 'feedback': 'n/a'},
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_teacher_cannot_grade_other_teachers_submission(self):
+        """Security: teacher A must not be able to grade a submission that
+        belongs to teacher B's course. This is the cross-teacher boundary
+        — a much subtler attack surface than student-vs-teacher.
+        """
+        other_teacher = User.objects.create_user(
+            username='other_teacher', email='ot@example.com',
+            password='testpass123', role='teacher',
+        )
+        other_token = Token.objects.create(user=other_teacher)
+        submission = Submission.objects.create(
+            assignment=self.assignment, student=self.student,
+            content='Work on teacher A\'s course',
+        )
+
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {other_token.key}')
+        response = self.client.patch(
+            f'/api/submissions/{submission.id}/grade/',
+            {'grade': 0, 'feedback': 'malicious grade attempt'},
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        # And the actual submission must NOT have been altered.
+        submission.refresh_from_db()
+        self.assertIsNone(submission.grade)

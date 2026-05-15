@@ -12,6 +12,11 @@ db.sqlite3
 .env
 media/
 
+# Coverage tool output
+.coverage
+htmlcov/
+.coverage.*
+
 # Node
 node_modules/
 frontend/build/
