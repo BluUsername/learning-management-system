@@ -91,6 +91,18 @@ test('shows error message when save fails', async () => {
     response: { data: { detail: 'Failed to update profile. Please try again.' } },
   });
 
+  // Use mockReturnValue (not mockReturnValueOnce) so the mock persists across
+  // component re-renders. The component re-renders when you edit the bio field.
+  useAuth.mockReturnValue({
+    user: {
+      id: 1, username: 'Tom', role: 'student',
+      first_name: 'Tom', last_name: 'Herman', bio: 'I love coding',
+      email: 'tom@email.com', date_joined: '2026-01-15T00:00:00Z',
+    },
+    updateUser: jest.fn(),
+  });
+  api.get.mockResolvedValueOnce({ data: [{ id: 1 }, { id: 2 }] });
+
   renderProfile();
   await screen.findByText(/@Tom/);
 
@@ -112,6 +124,16 @@ test('saves all profile fields together', async () => {
   api.patch.mockResolvedValueOnce({
     data: { first_name: 'Thomas', last_name: 'Smith', bio: 'New bio text' },
   });
+
+  useAuth.mockReturnValue({
+    user: {
+      id: 1, username: 'Tom', role: 'student',
+      first_name: 'Tom', last_name: 'Herman', bio: 'I love coding',
+      email: 'tom@email.com', date_joined: '2026-01-15T00:00:00Z',
+    },
+    updateUser: jest.fn(),
+  });
+  api.get.mockResolvedValueOnce({ data: [{ id: 1 }, { id: 2 }] });
 
   renderProfile();
   await screen.findByText(/@Tom/);
@@ -144,7 +166,10 @@ test('saves all profile fields together', async () => {
 // This test verifies the fix from PR #20 works correctly.
 test('refreshes user context after successful profile update', async () => {
   const mockFetchUser = jest.fn();
-  useAuth.mockReturnValueOnce({
+
+  // Use mockReturnValue (not mockReturnValueOnce) so the mock persists across
+  // component re-renders. The component will re-render when form fields change.
+  useAuth.mockReturnValue({
     user: {
       id: 1, username: 'Tom', role: 'student',
       first_name: 'Tom', last_name: 'Herman', bio: 'Old bio',

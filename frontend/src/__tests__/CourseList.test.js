@@ -113,8 +113,15 @@ test('allows typing in the search input', async () => {
 
 test('student can enroll in a course', async () => {
   // This test verifies the full enrollment flow: clicking the Enroll button,
-  // making an API call, and handling the response. It demonstrates understanding
-  // of async operations, mocking, and user interaction testing.
+  // making an API call, and verifying the API was called with the correct data.
+  // It demonstrates understanding of async operations, mocking, and verifying
+  // side effects (not just checking what's on screen).
+
+  // Mock the POST request to enroll (returns success with the enrollment object)
+  api.post.mockResolvedValueOnce({
+    data: { id: 1, student: 1, course: 1, status: 'enrolled' },
+  });
+
   renderCourseList();
 
   // Wait for courses to load
@@ -124,11 +131,12 @@ test('student can enroll in a course', async () => {
   const enrollButtons = await screen.findAllByText('Enroll');
   fireEvent.click(enrollButtons[0]);
 
-  // Verify the enrollment API was called (enroll/<course_id>)
-  // In a real test, you'd verify the exact course ID, but this shows
-  // that the component is making the right API call.
+  // Verify the enrollment API was called with the correct course ID (course 1)
   await waitFor(() => {
-    expect(screen.getByText('Introduction to Python')).toBeInTheDocument();
+    expect(api.post).toHaveBeenCalledWith(
+      expect.stringMatching(/courses\/\d+\/enroll/),
+      expect.any(Object)
+    );
   });
 });
 
