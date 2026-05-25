@@ -372,8 +372,8 @@ The application follows a **client-server architecture** with a clear separation
 
 ```bash
 # Clone the repository
-git clone https://github.com/BluUsername/LearningManagementSystem.git
-cd LearningManagementSystem
+git clone https://github.com/BluUsername/learning-management-system.git
+cd learning-management-system
 
 # Create and activate virtual environment
 python -m venv venv
