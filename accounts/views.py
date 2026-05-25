@@ -20,7 +20,11 @@ logger = logging.getLogger(__name__)
 
 
 class RegisterView(APIView):
-    """Register a new user and return an auth token."""
+    """Register a new user and return an auth token.
+
+    Accepts username, email, password, password confirmation, and role (student/teacher).
+    Immediately creates a token so the user is authenticated right after registration.
+    """
 
     permission_classes = [AllowAny]
 
@@ -37,7 +41,11 @@ class RegisterView(APIView):
 
 
 class LoginView(APIView):
-    """Authenticate a user and return an auth token."""
+    """Authenticate a user and return an auth token.
+
+    Validates username and password, then returns the user object and a token.
+    Uses get_or_create so repeated logins reuse the same token (no token proliferation).
+    """
 
     permission_classes = [AllowAny]
 
@@ -54,7 +62,12 @@ class LoginView(APIView):
 
 
 class LogoutView(APIView):
-    """Log out the current user by deleting their auth token."""
+    """Log out the current user by deleting their auth token server-side.
+
+    Destroying the token prevents token reuse after logout. Subsequent requests
+    with that token will be rejected as unauthorized, even if the token is still
+    present on the client. This is a real security boundary, not just a UI feature.
+    """
 
     permission_classes = [IsAuthenticated]
 
