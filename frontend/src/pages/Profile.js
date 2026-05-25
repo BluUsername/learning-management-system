@@ -20,7 +20,7 @@ import api, { getResults } from '../api/axiosConfig';
 import { useAuth } from '../contexts/AuthContext';
 
 function Profile() {
-  const { user } = useAuth();
+  const { user, fetchUser } = useAuth();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [bio, setBio] = useState('');
@@ -72,6 +72,7 @@ function Profile() {
         last_name: lastName,
         bio,
       });
+      await fetchUser();
       setAlert({ open: true, severity: 'success', message: 'Profile updated successfully!' });
     } catch (err) {
       const detail = err.response?.data?.detail || 'Failed to update profile. Please try again.';
