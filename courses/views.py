@@ -29,12 +29,14 @@ logger = logging.getLogger(__name__)
 
 
 class CourseListCreateView(generics.ListCreateAPIView):
-    """List all active courses or create a new one (teacher/admin only).
+    """List all active courses (authenticated user) or create one (teacher/admin).
 
-    GET returns paginated list of active courses with teacher info. Supports search
-    by title/description/teacher, filter by teacher or category, and sort by name
-    or date. Teachers and admins can POST to create a new course; the course is
-    automatically assigned to the requesting user as the teacher.
+    GET returns paginated list of active courses with teacher info. Any authenticated
+    user can list. Supports search by title/description/teacher, filter by category,
+    and sort by name or date.
+
+    POST creates a new course (teacher/admin only). The course is automatically
+    assigned to the requesting user as the teacher.
     """
 
     queryset = Course.objects.select_related('teacher').filter(is_active=True)
@@ -51,13 +53,15 @@ class CourseListCreateView(generics.ListCreateAPIView):
 
 
 class CourseDetailView(generics.RetrieveUpdateDestroyAPIView):
-    """Retrieve, update, or delete a course (owner/admin only).
+    """Retrieve course details (authenticated) or edit/delete (owner/admin only).
 
-    Supports GET to view course details, PATCH/PUT to edit, and DELETE to remove.
-    DELETE is a soft delete: marks the course inactive rather than destroying the
-    record. This preserves audit trails and allows cascade cleanup (inactive courses
-    don't show in student listings or accept new enrollments, but enrollments/grades
-    are preserved).
+    GET is available to any authenticated user.
+
+    PATCH/PUT/DELETE are restricted to the course owner (teacher who created it)
+    or admins. DELETE is a soft delete: marks the course inactive rather than
+    destroying the record. This preserves audit trails and allows cascade cleanup
+    (inactive courses don't show in student listings or accept new enrollments,
+    but enrollments/grades are preserved).
     """
 
     queryset = Course.objects.select_related('teacher').all()
@@ -154,11 +158,11 @@ class MyEnrollmentsView(generics.ListAPIView):
 # ---------------------------------------------------------------------------
 
 class AssignmentListCreateView(generics.ListCreateAPIView):
-    """List assignments for a course, or create one (course owner/admin only).
+    """List assignments (enrolled/staff) or create one (course owner/admin only).
 
-    GET lists all assignments for a course, including submission counts (how many
-    students submitted). Students can see assignments in courses they're enrolled
-    in; teachers/admins can see all assignments for their courses.
+    GET lists all assignments for a course (visible to enrolled students and course
+    staff). Includes submission counts. Teachers/admins see all assignments for
+    their courses; students see only assignments in courses they're enrolled in.
 
     POST creates a new assignment (teacher/admin only). The assignment is
     automatically attached to the requested course.
@@ -185,11 +189,14 @@ class AssignmentListCreateView(generics.ListCreateAPIView):
 
 
 class AssignmentDetailView(generics.RetrieveUpdateDestroyAPIView):
-    """Retrieve, update, or delete an assignment (course owner/admin only).
+    """Retrieve assignment (enrolled/staff) or edit/delete (course owner/admin).
 
-    GET returns assignment details with submission count. PATCH/PUT edits the
-    assignment (title, description, due date, point value). DELETE removes the
-    assignment and cascades deletion of all student submissions.
+    GET returns assignment details with submission count (visible to enrolled
+    students and course staff).
+
+    PATCH/PUT/DELETE are restricted to the course owner (teacher who created
+    the course) or admins. DELETE removes the assignment and cascades deletion
+    of all student submissions.
     """
 
     serializer_class = AssignmentSerializer
