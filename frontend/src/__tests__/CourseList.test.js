@@ -1,8 +1,24 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
 import CourseList from '../pages/CourseList';
 import { renderWithProviders } from '../test-utils';
 
 const mockEnrollments = [];
+const mockCourses = [
+  {
+    id: 1,
+    title: 'Introduction to Python',
+    description: 'Learn Python programming from scratch.',
+    teacher_name: 'Dr. Smith',
+    enrollment_count: 15,
+  },
+  {
+    id: 2,
+    title: 'Web Development 101',
+    description: 'Build modern web applications with React.',
+    teacher_name: 'Prof. Johnson',
+    enrollment_count: 30,
+  },
+];
 
 // Mock useAuth to return a student user
 jest.mock('../contexts/AuthContext', () => ({
@@ -14,35 +30,10 @@ jest.mock('../contexts/AuthContext', () => ({
 
 // Mock axios with jest.fn() for all methods so we can control responses per test
 jest.mock('../api/axiosConfig', () => {
-  const courses = [
-    {
-      id: 1,
-      title: 'Introduction to Python',
-      description: 'Learn Python programming from scratch.',
-      teacher_name: 'Dr. Smith',
-      enrollment_count: 15,
-    },
-    {
-      id: 2,
-      title: 'Web Development 101',
-      description: 'Build modern web applications with React.',
-      teacher_name: 'Prof. Johnson',
-      enrollment_count: 30,
-    },
-  ];
-
   return {
     __esModule: true,
     default: {
-      get: jest.fn((url) => {
-        if (url === 'courses/') {
-          return Promise.resolve({ data: { results: courses } });
-        }
-        if (url === 'enrollments/') {
-          return Promise.resolve({ data: { results: mockEnrollments } });
-        }
-        return Promise.resolve({ data: [] });
-      }),
+      get: jest.fn(),
       post: jest.fn(() => Promise.resolve({ data: {} })),
       interceptors: { request: { use: () => {} } },
     },
@@ -57,7 +48,8 @@ jest.mock('../api/axiosConfig', () => {
 const api = require('../api/axiosConfig').default;
 
 afterEach(() => {
-  jest.clearAllMocks();
+  api.get.mockClear();
+  api.post.mockClear();
 });
 
 function renderCourseList() {
@@ -66,6 +58,16 @@ function renderCourseList() {
 
 beforeEach(() => {
   mockEnrollments.length = 0;
+  api.get.mockImplementation((url) => {
+    if (url === 'courses/') {
+      return Promise.resolve({ data: { results: mockCourses } });
+    }
+    if (url === 'enrollments/') {
+      return Promise.resolve({ data: { results: mockEnrollments } });
+    }
+    return Promise.resolve({ data: [] });
+  });
+  api.post.mockResolvedValue({ data: {} });
 });
 
 test('renders page heading', async () => {
@@ -136,8 +138,7 @@ test('student can enroll in a course', async () => {
   // Verify the enrollment API was called with the correct course ID (course 1)
   await waitFor(() => {
     expect(api.post).toHaveBeenCalledWith(
-      expect.stringMatching(/courses\/\d+\/enroll/),
-      expect.any(Object)
+      expect.stringMatching(/courses\/\d+\/enroll/)
     );
   });
 });
