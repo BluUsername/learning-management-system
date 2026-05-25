@@ -12,7 +12,7 @@ jest.mock('../contexts/AuthContext', () => ({
   }),
 }));
 
-// Mock axios with plain functions (not jest.fn) so implementations persist
+// Mock axios with jest.fn() for all methods so we can control responses per test
 jest.mock('../api/axiosConfig', () => {
   const courses = [
     {
@@ -34,7 +34,7 @@ jest.mock('../api/axiosConfig', () => {
   return {
     __esModule: true,
     default: {
-      get: (url) => {
+      get: jest.fn((url) => {
         if (url === 'courses/') {
           return Promise.resolve({ data: { results: courses } });
         }
@@ -42,8 +42,8 @@ jest.mock('../api/axiosConfig', () => {
           return Promise.resolve({ data: { results: mockEnrollments } });
         }
         return Promise.resolve({ data: [] });
-      },
-      post: () => Promise.resolve({ data: {} }),
+      }),
+      post: jest.fn(() => Promise.resolve({ data: {} })),
       interceptors: { request: { use: () => {} } },
     },
     getResults: (data) => {
@@ -52,6 +52,12 @@ jest.mock('../api/axiosConfig', () => {
       return [];
     },
   };
+});
+
+const api = require('../api/axiosConfig').default;
+
+afterEach(() => {
+  jest.clearAllMocks();
 });
 
 function renderCourseList() {
