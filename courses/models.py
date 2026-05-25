@@ -12,13 +12,12 @@ class Course(models.Model):
         on_delete=models.CASCADE,
         related_name='taught_courses',
     )
-    # #11 - Course capacity limit (null = unlimited)
+    # null = unlimited capacity
     max_students = models.PositiveIntegerField(null=True, blank=True)
-    # #14 - Course category
     category = models.CharField(max_length=50, blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    # #12 - Soft delete support
+    # Soft delete: is_active=False hides course but preserves enrollments and grades
     is_active = models.BooleanField(default=True)
 
     class Meta:
@@ -55,7 +54,6 @@ class Enrollment(models.Model):
         on_delete=models.CASCADE,
         related_name='enrollments',
     )
-    # #15 - Enrollment status tracking
     status = models.CharField(
         max_length=15, choices=STATUS_CHOICES, default='enrolled',
     )

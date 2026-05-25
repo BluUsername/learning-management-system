@@ -13,7 +13,6 @@ class User(AbstractUser):
 
     email = models.EmailField(unique=True)
     role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='student')
-    # #13 - Extended profile fields
     bio = models.TextField(blank=True, default='')
 
     def __str__(self) -> str:
