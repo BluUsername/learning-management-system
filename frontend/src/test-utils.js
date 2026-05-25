@@ -7,7 +7,9 @@ const theme = createTheme();
 export function renderWithProviders(ui) {
   return render(
     <ThemeProvider theme={theme}>
-      <BrowserRouter>{ui}</BrowserRouter>
+      <BrowserRouter>
+        {ui}
+      </BrowserRouter>
     </ThemeProvider>
   );
 }

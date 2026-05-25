@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
 import CourseList from '../pages/CourseList';
+import { renderWithProviders } from '../test-utils';
 
 const mockEnrollments = [];
 
@@ -61,11 +61,7 @@ afterEach(() => {
 });
 
 function renderCourseList() {
-  return render(
-    <BrowserRouter>
-      <CourseList />
-    </BrowserRouter>
-  );
+  return renderWithProviders(<CourseList />);
 }
 
 beforeEach(() => {
