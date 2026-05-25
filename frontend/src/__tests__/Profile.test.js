@@ -24,8 +24,9 @@ beforeEach(() => {
     },
     updateUser: jest.fn(),
   });
-  // Profile fetches enrollments for stats
-  api.get.mockResolvedValueOnce({ data: [{ id: 1 }, { id: 2 }] });
+  // Profile fetches enrollments for stats — use mockResolvedValue so every test
+  // gets this response without consuming a one-time mock
+  api.get.mockResolvedValue({ data: [{ id: 1 }, { id: 2 }] });
 });
 
 function renderProfile() {
@@ -91,6 +92,7 @@ test('shows error message when save fails', async () => {
     response: { data: { detail: 'Failed to update profile. Please try again.' } },
   });
 
+  // useAuth and api.get are already mocked in beforeEach
   renderProfile();
   await screen.findByText(/@Tom/);
 
@@ -113,6 +115,7 @@ test('saves all profile fields together', async () => {
     data: { first_name: 'Thomas', last_name: 'Smith', bio: 'New bio text' },
   });
 
+  // useAuth and api.get are already mocked in beforeEach
   renderProfile();
   await screen.findByText(/@Tom/);
 
@@ -136,5 +139,43 @@ test('saves all profile fields together', async () => {
       last_name: 'Smith',
       bio: 'New bio text',
     });
+  });
+});
+
+// CRITICAL TEST: After profile update succeeds, AuthContext must refresh
+// so the UI reflects updated user data (hero banner, account info, etc).
+// This test verifies the fix from PR #20 works correctly.
+test('refreshes user context after successful profile update', async () => {
+  const mockFetchUser = jest.fn();
+
+  // Override useAuth for this specific test to include fetchUser
+  useAuth.mockReturnValue({
+    user: {
+      id: 1, username: 'Tom', role: 'student',
+      first_name: 'Tom', last_name: 'Herman', bio: 'Old bio',
+      email: 'tom@email.com', date_joined: '2026-01-15T00:00:00Z',
+    },
+    fetchUser: mockFetchUser,
+  });
+
+  api.patch.mockResolvedValueOnce({
+    data: { first_name: 'Tom', last_name: 'Herman', bio: 'Updated bio' },
+  });
+
+  renderProfile();
+  await screen.findByText(/@Tom/);
+
+  // Update the bio
+  fireEvent.change(screen.getByLabelText(/Bio/), {
+    target: { value: 'Updated bio' },
+  });
+
+  // Save changes
+  fireEvent.click(screen.getByText('Save Changes'));
+
+  // Verify that fetchUser() was called to refresh the AuthContext
+  // This ensures the UI will update with fresh user data from the server
+  await waitFor(() => {
+    expect(mockFetchUser).toHaveBeenCalled();
   });
 });

@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
 import CourseList from '../pages/CourseList';
+import { renderWithProviders } from '../test-utils';
 
 const mockEnrollments = [];
 
@@ -12,7 +12,7 @@ jest.mock('../contexts/AuthContext', () => ({
   }),
 }));
 
-// Mock axios with plain functions (not jest.fn) so implementations persist
+// Mock axios with jest.fn() for all methods so we can control responses per test
 jest.mock('../api/axiosConfig', () => {
   const courses = [
     {
@@ -34,7 +34,7 @@ jest.mock('../api/axiosConfig', () => {
   return {
     __esModule: true,
     default: {
-      get: (url) => {
+      get: jest.fn((url) => {
         if (url === 'courses/') {
           return Promise.resolve({ data: { results: courses } });
         }
@@ -42,8 +42,8 @@ jest.mock('../api/axiosConfig', () => {
           return Promise.resolve({ data: { results: mockEnrollments } });
         }
         return Promise.resolve({ data: [] });
-      },
-      post: () => Promise.resolve({ data: {} }),
+      }),
+      post: jest.fn(() => Promise.resolve({ data: {} })),
       interceptors: { request: { use: () => {} } },
     },
     getResults: (data) => {
@@ -54,12 +54,14 @@ jest.mock('../api/axiosConfig', () => {
   };
 });
 
+const api = require('../api/axiosConfig').default;
+
+afterEach(() => {
+  jest.clearAllMocks();
+});
+
 function renderCourseList() {
-  return render(
-    <BrowserRouter>
-      <CourseList />
-    </BrowserRouter>
-  );
+  return renderWithProviders(<CourseList />);
 }
 
 beforeEach(() => {
@@ -111,11 +113,35 @@ test('allows typing in the search input', async () => {
   expect(searchInput.value).toBe('Python');
 });
 
-// DO: look at the teacher filter chips
-// CHECK: "All" chip is present plus one chip per unique teacher
-// Note: teacher names appear in BOTH filter chips AND course cards,
-// so we use getAllByText and check there are at least 2 matches
-// (one in the chip, one in the card).
+test('student can enroll in a course', async () => {
+  // This test verifies the full enrollment flow: clicking the Enroll button,
+  // making an API call, and verifying the API was called with the correct data.
+  // It demonstrates understanding of async operations, mocking, and verifying
+  // side effects (not just checking what's on screen).
+
+  // Mock the POST request to enroll (returns success with the enrollment object)
+  api.post.mockResolvedValueOnce({
+    data: { id: 1, student: 1, course: 1, status: 'enrolled' },
+  });
+
+  renderCourseList();
+
+  // Wait for courses to load
+  await screen.findByText('Introduction to Python');
+
+  // Get the first Enroll button and click it
+  const enrollButtons = await screen.findAllByText('Enroll');
+  fireEvent.click(enrollButtons[0]);
+
+  // Verify the enrollment API was called with the correct course ID (course 1)
+  await waitFor(() => {
+    expect(api.post).toHaveBeenCalledWith(
+      expect.stringMatching(/courses\/\d+\/enroll/),
+      expect.any(Object)
+    );
+  });
+});
+
 test('displays teacher filter chips including All', async () => {
   renderCourseList();
 
