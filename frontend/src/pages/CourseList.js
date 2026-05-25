@@ -26,8 +26,17 @@ function CourseList() {
         const enrollRes = await api.get('enrollments/');
         setEnrolledIds(
           getResults(enrollRes.data)
-            .map((e) => (typeof e.course === 'object' ? e.course?.id : e.course))
-            .filter(Boolean)
+            .map((enrollment) => {
+              const course = enrollment?.course;
+              if (typeof course === 'number') {
+                return course;
+              }
+              if (course && typeof course === 'object') {
+                return course.id;
+              }
+              return null;
+            })
+            .filter((id) => id !== null && id !== undefined)
         );
       }
     } catch {

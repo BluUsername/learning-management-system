@@ -10,18 +10,6 @@ jest.mock('../api/axiosConfig', () => ({
   interceptors: { request: { use: jest.fn() } },
 }));
 
-// Mock matchMedia for useMediaQuery in jsdom environment
-window.matchMedia = window.matchMedia || function matchMedia() {
-  return {
-    matches: false,
-    addListener: () => {},
-    removeListener: () => {},
-    addEventListener: () => {},
-    removeEventListener: () => {},
-    dispatchEvent: () => false,
-  };
-};
-
 beforeEach(() => {
   localStorage.clear();
 });
