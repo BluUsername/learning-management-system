@@ -16,7 +16,7 @@ class CourseSerializer(serializers.ModelSerializer):
         model = Course
         fields = [
             'id', 'title', 'description', 'teacher', 'teacher_name',
-            'category', 'max_students',  # #11, #14
+            'category', 'max_students',
             'enrollment_count', 'is_full',
             'created_at', 'updated_at',
         ]
@@ -33,7 +33,7 @@ class EnrollmentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Enrollment
-        fields = ['id', 'course', 'status', 'enrolled_at']  # #15 - status field
+        fields = ['id', 'course', 'status', 'enrolled_at']
         read_only_fields = ['id', 'enrolled_at']
 
 
