@@ -169,7 +169,22 @@ LearningManagementSystem/
 
 ## Front-End Wireframes & Screenshots
 
-The following wireframes represent the final implemented design of each page, captured from the deployed application. Each screenshot demonstrates the responsive layout, consistent colour palette, and role-based UI tailored to the user type.
+### Figma Wireframes
+
+The complete set of design mockups lives in Figma — **[LearnHub — Design Mockups](https://www.figma.com/design/4JoA5G16ce9jKcG9rOouWA/LearnHub-%E2%80%94-Design-Mockups)**.
+
+The file contains 16 dark-theme mockups grouped into 4 sections that mirror the platform's role-based access model:
+
+- **01 · Public** — Login, Register, About, Help & FAQ
+- **02 · Student** — Student Dashboard, Course List, Course Detail, Assignment Detail
+- **03 · Teacher / Admin** — Teacher Dashboard, Admin Dashboard, User Management, Leaderboard
+- **04 · Cross-cutting** — Profile, Settings, Achievements, Chat Assistant
+
+Each mockup uses the same brand palette as the live site (dark navy `#0a0e1a` backgrounds, blue→purple gradient CTAs `#1565c0 → #7b1fa2`) and includes annotation callouts at the bottom describing the page's API contract, permission rules, and role-aware behaviour.
+
+### Production Screenshots
+
+The screenshots below capture the same pages as rendered in the deployed application. Each demonstrates the responsive layout, consistent colour palette, and role-based UI tailored to the user type.
 
 ### Login Page
 Split-screen layout with an Unsplash hero image on the left featuring the LearnHub brand and tagline. The right panel contains username and password fields, a gradient "Sign in" button, and a link to the registration page.
