@@ -1,28 +1,21 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
 import Register from '../pages/Register';
-import { AuthProvider } from '../contexts/AuthContext';
+import { renderWithProviders } from '../test-utils';
 
-jest.mock('../api/axiosConfig', () => ({
-  get: jest.fn(),
-  post: jest.fn(),
-  interceptors: { request: { use: jest.fn() } },
+const mockRegister = jest.fn();
+
+jest.mock('../contexts/AuthContext', () => ({
+  useAuth: () => ({
+    register: mockRegister,
+  }),
 }));
-
-const api = require('../api/axiosConfig');
 
 afterEach(() => {
   jest.clearAllMocks();
 });
 
 function renderRegister() {
-  return render(
-    <BrowserRouter>
-      <AuthProvider>
-        <Register />
-      </AuthProvider>
-    </BrowserRouter>
-  );
+  return renderWithProviders(<Register />);
 }
 
 test('renders Get started heading', () => {
@@ -63,14 +56,14 @@ test('shows error when passwords do not match', async () => {
   fireEvent.click(screen.getByRole('button', { name: /create account/i }));
 
   expect(await screen.findByText(/passwords do not match/i)).toBeInTheDocument();
-  // The API should NOT have been called — validation stopped it
-  expect(api.post).not.toHaveBeenCalled();
+  // The register function should NOT have been called — validation stopped it
+  expect(mockRegister).not.toHaveBeenCalled();
 });
 
 test('shows API error when registration fails', async () => {
   // This tests SERVER-SIDE validation — the API rejects the request
   // (e.g. duplicate username) and we display the error.
-  api.post.mockRejectedValueOnce({
+  mockRegister.mockRejectedValueOnce({
     response: { data: { username: ['A user with that username already exists.'] } },
   });
 
@@ -95,12 +88,7 @@ test('shows API error when registration fails', async () => {
 test('calls register API with all form data', async () => {
   // This tests the HAPPY PATH — a successful registration.
   // We verify the API was called with exactly the right data.
-  api.post.mockResolvedValueOnce({
-    data: {
-      token: 'new-token-123',
-      user: { id: 5, username: 'newuser', role: 'student' },
-    },
-  });
+  mockRegister.mockResolvedValueOnce({ id: 5, username: 'newuser', role: 'student' });
 
   renderRegister();
   fireEvent.change(screen.getByPlaceholderText(/choose a username/i), {
@@ -118,12 +106,12 @@ test('calls register API with all form data', async () => {
   fireEvent.click(screen.getByRole('button', { name: /create account/i }));
 
   await waitFor(() => {
-    expect(api.post).toHaveBeenCalledWith('auth/register/', {
-      username: 'newuser',
-      email: 'new@example.com',
-      password: 'securepass',
-      password2: 'securepass',
-      role: 'student',
-    });
+    expect(mockRegister).toHaveBeenCalledWith(
+      'newuser',
+      'new@example.com',
+      'securepass',
+      'securepass',
+      'student'
+    );
   });
 });

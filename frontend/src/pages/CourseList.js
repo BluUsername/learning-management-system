@@ -24,14 +24,18 @@ function CourseList() {
 
       if (user?.role === 'student') {
         const enrollRes = await api.get('enrollments/');
-        setEnrolledIds(getResults(enrollRes.data).map((e) => e.course.id));
-        }
-      } catch {
-        setError('Failed to load courses.');
-      } finally {
-        setLoading(false);
+        setEnrolledIds(
+          getResults(enrollRes.data)
+            .map((e) => (typeof e.course === 'object' ? e.course?.id : e.course))
+            .filter(Boolean)
+        );
       }
-    }, [user?.role]);
+    } catch {
+      setError('Failed to load courses.');
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.role]);
 
   useDocumentTitle('Courses');
 
