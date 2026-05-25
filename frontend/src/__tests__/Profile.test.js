@@ -24,8 +24,9 @@ beforeEach(() => {
     },
     updateUser: jest.fn(),
   });
-  // Profile fetches enrollments for stats
-  api.get.mockResolvedValueOnce({ data: [{ id: 1 }, { id: 2 }] });
+  // Profile fetches enrollments for stats — use mockResolvedValue so every test
+  // gets this response without consuming a one-time mock
+  api.get.mockResolvedValue({ data: [{ id: 1 }, { id: 2 }] });
 });
 
 function renderProfile() {
@@ -91,18 +92,7 @@ test('shows error message when save fails', async () => {
     response: { data: { detail: 'Failed to update profile. Please try again.' } },
   });
 
-  // Use mockReturnValue (not mockReturnValueOnce) so the mock persists across
-  // component re-renders. The component re-renders when you edit the bio field.
-  useAuth.mockReturnValue({
-    user: {
-      id: 1, username: 'Tom', role: 'student',
-      first_name: 'Tom', last_name: 'Herman', bio: 'I love coding',
-      email: 'tom@email.com', date_joined: '2026-01-15T00:00:00Z',
-    },
-    updateUser: jest.fn(),
-  });
-  api.get.mockResolvedValueOnce({ data: [{ id: 1 }, { id: 2 }] });
-
+  // useAuth and api.get are already mocked in beforeEach
   renderProfile();
   await screen.findByText(/@Tom/);
 
@@ -125,16 +115,7 @@ test('saves all profile fields together', async () => {
     data: { first_name: 'Thomas', last_name: 'Smith', bio: 'New bio text' },
   });
 
-  useAuth.mockReturnValue({
-    user: {
-      id: 1, username: 'Tom', role: 'student',
-      first_name: 'Tom', last_name: 'Herman', bio: 'I love coding',
-      email: 'tom@email.com', date_joined: '2026-01-15T00:00:00Z',
-    },
-    updateUser: jest.fn(),
-  });
-  api.get.mockResolvedValueOnce({ data: [{ id: 1 }, { id: 2 }] });
-
+  // useAuth and api.get are already mocked in beforeEach
   renderProfile();
   await screen.findByText(/@Tom/);
 
@@ -167,8 +148,7 @@ test('saves all profile fields together', async () => {
 test('refreshes user context after successful profile update', async () => {
   const mockFetchUser = jest.fn();
 
-  // Use mockReturnValue (not mockReturnValueOnce) so the mock persists across
-  // component re-renders. The component will re-render when form fields change.
+  // Override useAuth for this specific test to include fetchUser
   useAuth.mockReturnValue({
     user: {
       id: 1, username: 'Tom', role: 'student',
@@ -178,7 +158,6 @@ test('refreshes user context after successful profile update', async () => {
     fetchUser: mockFetchUser,
   });
 
-  api.get.mockResolvedValueOnce({ data: [] }); // enrollments fetch
   api.patch.mockResolvedValueOnce({
     data: { first_name: 'Tom', last_name: 'Herman', bio: 'Updated bio' },
   });
