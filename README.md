@@ -589,6 +589,8 @@ The application is deployed and live:
 | **Frontend** | Netlify | [https://thelearnhub.netlify.app](https://thelearnhub.netlify.app) |
 | **Backend API** | Heroku | [https://lms-backend-tom-25f123572e9b.herokuapp.com/api/](https://lms-backend-tom-25f123572e9b.herokuapp.com/api/) |
 
+> **Note:** The backend can be run locally following the Setup & Installation section. Frontend is fully deployed on Netlify.
+
 ### Deployment Stack
 
 - **Backend (Heroku):** Gunicorn WSGI server, WhiteNoise for static files, PostgreSQL database (via Heroku Postgres), `dj-database-url` for database configuration, environment variables for secrets and CORS origins
