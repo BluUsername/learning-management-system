@@ -29,12 +29,19 @@ logger = logging.getLogger(__name__)
 
 
 class CourseListCreateView(generics.ListCreateAPIView):
-    """List all courses or create a new one (teacher/admin only)."""
+    """List all active courses (authenticated user) or create one (teacher/admin).
+
+    GET returns paginated list of active courses with teacher info. Any authenticated
+    user can list. Supports search by title/description/teacher, filter by category,
+    and sort by name or date.
+
+    POST creates a new course (teacher/admin only). The course is automatically
+    assigned to the requesting user as the teacher.
+    """
 
     queryset = Course.objects.select_related('teacher').filter(is_active=True)
     serializer_class = CourseSerializer
     permission_classes = [IsTeacherOrAdmin]
-    # #10 - Search and filtering
     filterset_fields = ['teacher', 'category']
     search_fields = ['title', 'description', 'teacher__username', 'category']
     ordering_fields = ['title', 'created_at', 'updated_at']
@@ -46,21 +53,38 @@ class CourseListCreateView(generics.ListCreateAPIView):
 
 
 class CourseDetailView(generics.RetrieveUpdateDestroyAPIView):
-    """Retrieve, update, or delete a course."""
+    """Retrieve course details (authenticated) or edit/delete (owner/admin only).
+
+    GET is available to any authenticated user.
+
+    PATCH/PUT/DELETE are restricted to the course owner (teacher who created it)
+    or admins. DELETE is a soft delete: marks the course inactive rather than
+    destroying the record. This preserves audit trails and allows cascade cleanup
+    (inactive courses don't show in student listings or accept new enrollments,
+    but enrollments/grades are preserved).
+    """
 
     queryset = Course.objects.select_related('teacher').all()
     serializer_class = CourseSerializer
     permission_classes = [IsAuthenticated, IsCourseOwnerOrAdmin]
 
     def perform_destroy(self, instance: Course) -> None:
-        """#12 - Soft delete: mark as inactive instead of deleting."""
         instance.is_active = False
         instance.save()
         logger.info(f"Course soft-deleted: '{instance.title}'")
 
 
 class EnrollView(APIView):
-    """Enroll the current student in a course."""
+    """Enroll the current student in a course.
+
+    POST /courses/<id>/enroll/ enrolls the requesting user in the course if:
+    1. The course exists and is active
+    2. The course is not at capacity (max_students limit)
+    3. The user is not already enrolled
+
+    Returns 201 with the enrollment record, or 400/404 with error details if
+    validation fails.
+    """
 
     permission_classes = [IsStudent]
 
@@ -73,7 +97,6 @@ class EnrollView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        # #11 - Check capacity
         if course.is_full:
             return Response(
                 {'detail': 'This course is full.'},
@@ -114,7 +137,12 @@ class UnenrollView(APIView):
 
 
 class MyEnrollmentsView(generics.ListAPIView):
-    """List the current student's enrollments."""
+    """List the current student's enrollments with full course details.
+
+    Returns paginated list of courses the user is enrolled in, with course info,
+    teacher details, and enrollment metadata. Used by the student dashboard to
+    show "My Courses".
+    """
 
     serializer_class = EnrollmentSerializer
     permission_classes = [IsStudent]
@@ -130,7 +158,15 @@ class MyEnrollmentsView(generics.ListAPIView):
 # ---------------------------------------------------------------------------
 
 class AssignmentListCreateView(generics.ListCreateAPIView):
-    """List assignments for a course, or create one (course owner/admin)."""
+    """List assignments (enrolled/staff) or create one (course owner/admin only).
+
+    GET lists all assignments for a course (visible to enrolled students and course
+    staff). Includes submission counts. Teachers/admins see all assignments for
+    their courses; students see only assignments in courses they're enrolled in.
+
+    POST creates a new assignment (teacher/admin only). The assignment is
+    automatically attached to the requested course.
+    """
 
     serializer_class = AssignmentSerializer
     permission_classes = [IsEnrolledOrCourseStaff, IsAssignmentCourseOwnerOrAdmin]
@@ -153,7 +189,15 @@ class AssignmentListCreateView(generics.ListCreateAPIView):
 
 
 class AssignmentDetailView(generics.RetrieveUpdateDestroyAPIView):
-    """Retrieve, update, or delete an assignment."""
+    """Retrieve assignment (enrolled/staff) or edit/delete (course owner/admin).
+
+    GET returns assignment details with submission count (visible to enrolled
+    students and course staff).
+
+    PATCH/PUT/DELETE are restricted to the course owner (teacher who created
+    the course) or admins. DELETE removes the assignment and cascades deletion
+    of all student submissions.
+    """
 
     serializer_class = AssignmentSerializer
     permission_classes = [IsEnrolledOrCourseStaff, IsAssignmentCourseOwnerOrAdmin]
@@ -168,7 +212,16 @@ class AssignmentDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 class SubmissionCreateView(APIView):
-    """Student submits work for an assignment."""
+    """Student submits work (text and/or file upload) for an assignment.
+
+    Enforces three business rules:
+    1. Student must be enrolled in the course that owns the assignment
+    2. Student can only submit once per assignment (no overwrites)
+    3. Submission must include either text content or a file (not empty)
+
+    Accepts multipart/form-data with optional 'content' (text) and 'file' (upload).
+    Returns 201 with the submission record, or 400/403/404 with validation details.
+    """
 
     permission_classes = [IsStudent]
 
@@ -183,7 +236,6 @@ class SubmissionCreateView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        # Student must be enrolled in the course
         if not Enrollment.objects.filter(
             student=request.user, course=assignment.course,
         ).exists():
@@ -192,7 +244,6 @@ class SubmissionCreateView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        # One submission per student per assignment
         if Submission.objects.filter(
             assignment=assignment, student=request.user,
         ).exists():
@@ -201,11 +252,9 @@ class SubmissionCreateView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Coerce to string: client may send {"content": null} or omit it entirely
         content = (request.data.get('content') or '').strip()
         uploaded_file = request.FILES.get('file')
 
-        # Must provide at least text content or a file
         if not content and not uploaded_file:
             return Response(
                 {'detail': 'Please provide text content or upload a file.'},
@@ -230,7 +279,13 @@ class SubmissionCreateView(APIView):
 
 
 class SubmissionListView(generics.ListAPIView):
-    """List submissions for an assignment (teacher sees all, student sees own)."""
+    """List submissions for an assignment (permission-aware filtering).
+
+    Teachers and admins see all submissions for their assignment.
+    Students see only their own submission(s). This endpoint powers both the
+    teacher's grading dashboard (all submissions) and the student's submission
+    history (personal only).
+    """
 
     serializer_class = SubmissionSerializer
     permission_classes = [IsAuthenticated]
