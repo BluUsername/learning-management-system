@@ -1,12 +1,12 @@
-import { render, screen } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
+import { screen } from '@testing-library/react';
 import About from '../pages/About';
+import { renderWithProviders } from '../test-utils';
 
 // About is a static marketing page — no API calls needed.
 // We just check that all sections render correctly.
 
 function renderPage() {
-  return render(<BrowserRouter><About /></BrowserRouter>);
+  return renderWithProviders(<About />);
 }
 
 // CHECK: hero section renders with brand name

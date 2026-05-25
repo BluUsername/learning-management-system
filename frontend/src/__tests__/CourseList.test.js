@@ -2,6 +2,8 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import CourseList from '../pages/CourseList';
 
+const mockEnrollments = [];
+
 // Mock useAuth to return a student user
 jest.mock('../contexts/AuthContext', () => ({
   useAuth: () => ({
@@ -37,7 +39,7 @@ jest.mock('../api/axiosConfig', () => {
           return Promise.resolve({ data: { results: courses } });
         }
         if (url === 'enrollments/') {
-          return Promise.resolve({ data: { results: [] } });
+          return Promise.resolve({ data: { results: mockEnrollments } });
         }
         return Promise.resolve({ data: [] });
       },
@@ -59,6 +61,10 @@ function renderCourseList() {
     </BrowserRouter>
   );
 }
+
+beforeEach(() => {
+  mockEnrollments.length = 0;
+});
 
 test('renders page heading', async () => {
   renderCourseList();
@@ -118,4 +124,16 @@ test('displays teacher filter chips including All', async () => {
   // Each teacher name appears in both the filter chip AND the course card
   expect(screen.getAllByText('Dr. Smith').length).toBeGreaterThanOrEqual(2);
   expect(screen.getAllByText('Prof. Johnson').length).toBeGreaterThanOrEqual(2);
+});
+
+test('handles enrolled course ids when enrollment course values are mixed', async () => {
+  mockEnrollments.push({ course: 1 }, { course: { id: 2 } }, { course: null });
+
+  renderCourseList();
+
+  await screen.findByText('All Courses');
+  expect(screen.queryByText('Failed to load courses.')).not.toBeInTheDocument();
+  await waitFor(() => {
+    expect(screen.queryAllByText('Enroll')).toHaveLength(0);
+  });
 });
