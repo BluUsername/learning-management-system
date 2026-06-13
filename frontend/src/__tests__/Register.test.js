@@ -60,9 +60,10 @@ test('shows error when passwords do not match', async () => {
   expect(mockRegister).not.toHaveBeenCalled();
 });
 
-test('shows API error when registration fails', async () => {
-  // This tests SERVER-SIDE validation — the API rejects the request
-  // (e.g. duplicate username) and we display the error.
+test('shows API error when registration fails (legacy flat format)', async () => {
+  // Backwards-compatibility path: plain DRF format { field: [errors] }.
+  // This shape is no longer what the backend sends, but we keep the fallback
+  // so the page degrades gracefully if the envelope is ever removed.
   mockRegister.mockRejectedValueOnce({
     response: { data: { username: ['A user with that username already exists.'] } },
   });
@@ -83,6 +84,73 @@ test('shows API error when registration fails', async () => {
   fireEvent.click(screen.getByRole('button', { name: /create account/i }));
 
   expect(await screen.findByText(/already exists/i)).toBeInTheDocument();
+});
+
+test('shows API error when registration fails (custom error envelope with details)', async () => {
+  // Primary path: the backend custom_exception_handler wraps errors in
+  // { error: { status_code, message, details } }. This is what the real
+  // backend sends and what caused the [object Object] bug.
+  mockRegister.mockRejectedValueOnce({
+    response: {
+      data: {
+        error: {
+          status_code: 400,
+          message: 'Validation error on: username',
+          details: { username: ['A user with that username already exists.'] },
+        },
+      },
+    },
+  });
+
+  renderRegister();
+  fireEvent.change(screen.getByPlaceholderText(/choose a username/i), {
+    target: { value: 'existing' },
+  });
+  fireEvent.change(screen.getByPlaceholderText(/you@example.com/i), {
+    target: { value: 'test@example.com' },
+  });
+  fireEvent.change(screen.getByPlaceholderText(/minimum 8 characters/i), {
+    target: { value: 'pass1234' },
+  });
+  fireEvent.change(screen.getByPlaceholderText(/re-enter your password/i), {
+    target: { value: 'pass1234' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: /create account/i }));
+
+  expect(await screen.findByText(/already exists/i)).toBeInTheDocument();
+});
+
+test('shows API error when registration fails (custom error envelope, message only)', async () => {
+  // Fallback within the envelope: details is absent but message is present.
+  // Covers e.g. a non-field error or an unexpected server-side rejection.
+  mockRegister.mockRejectedValueOnce({
+    response: {
+      data: {
+        error: {
+          status_code: 400,
+          message: 'Registration is currently disabled.',
+          details: null,
+        },
+      },
+    },
+  });
+
+  renderRegister();
+  fireEvent.change(screen.getByPlaceholderText(/choose a username/i), {
+    target: { value: 'newuser' },
+  });
+  fireEvent.change(screen.getByPlaceholderText(/you@example.com/i), {
+    target: { value: 'new@example.com' },
+  });
+  fireEvent.change(screen.getByPlaceholderText(/minimum 8 characters/i), {
+    target: { value: 'pass1234' },
+  });
+  fireEvent.change(screen.getByPlaceholderText(/re-enter your password/i), {
+    target: { value: 'pass1234' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: /create account/i }));
+
+  expect(await screen.findByText(/registration is currently disabled/i)).toBeInTheDocument();
 });
 
 test('calls register API with all form data', async () => {
