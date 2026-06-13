@@ -34,8 +34,13 @@ function Login() {
         default: navigate('/courses');
       }
     } catch (err) {
-      const message = err.response?.data?.non_field_errors?.[0]
-        || err.response?.data?.detail
+      const data = err.response?.data;
+      // Custom error envelope: { error: { status_code, message, details } }
+      const message =
+        data?.error?.details?.non_field_errors?.[0]
+        || data?.error?.message
+        || data?.non_field_errors?.[0]
+        || data?.detail
         || 'Login failed. Please try again.';
       setError(message);
     } finally {

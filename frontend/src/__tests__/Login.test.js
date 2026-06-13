@@ -64,13 +64,13 @@ test('allows typing in form fields', () => {
 // These test real user flows: filling in forms, clicking buttons,
 // and verifying the outcome (success or error messages).
 
-test('shows error message when login fails', async () => {
-  // Arrange: make the API return an error when login is attempted
+test('shows error message when login fails (legacy flat format)', async () => {
+  // Backwards-compatibility path: plain DRF format { non_field_errors: [...] }.
+  // Kept so the page degrades gracefully if the envelope is ever removed.
   api.post.mockRejectedValueOnce({
     response: { data: { non_field_errors: ['Invalid username or password.'] } },
   });
 
-  // Act: render the form, fill in fields, click submit
   renderLogin();
   fireEvent.change(screen.getByPlaceholderText(/enter your username/i), {
     target: { value: 'wronguser' },
@@ -80,8 +80,62 @@ test('shows error message when login fails', async () => {
   });
   fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
 
-  // Assert: the error message should appear on screen
   expect(await screen.findByText(/invalid username or password/i)).toBeInTheDocument();
+});
+
+test('shows error message when login fails (custom error envelope with details)', async () => {
+  // Primary path: the backend custom_exception_handler wraps errors in
+  // { error: { status_code, message, details } }. This is what the real
+  // backend sends for a bad username/password.
+  api.post.mockRejectedValueOnce({
+    response: {
+      data: {
+        error: {
+          status_code: 400,
+          message: 'Validation error on: non_field_errors',
+          details: { non_field_errors: ['Invalid username or password.'] },
+        },
+      },
+    },
+  });
+
+  renderLogin();
+  fireEvent.change(screen.getByPlaceholderText(/enter your username/i), {
+    target: { value: 'wronguser' },
+  });
+  fireEvent.change(screen.getByPlaceholderText(/enter your password/i), {
+    target: { value: 'wrongpass' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
+
+  expect(await screen.findByText(/invalid username or password/i)).toBeInTheDocument();
+});
+
+test('shows error message when login fails (custom error envelope, message only)', async () => {
+  // Fallback within the envelope: details is absent but message is present.
+  // Covers e.g. an account-level rejection that has no field-level details.
+  api.post.mockRejectedValueOnce({
+    response: {
+      data: {
+        error: {
+          status_code: 403,
+          message: 'This account has been disabled.',
+          details: null,
+        },
+      },
+    },
+  });
+
+  renderLogin();
+  fireEvent.change(screen.getByPlaceholderText(/enter your username/i), {
+    target: { value: 'disableduser' },
+  });
+  fireEvent.change(screen.getByPlaceholderText(/enter your password/i), {
+    target: { value: 'pass1234' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
+
+  expect(await screen.findByText(/this account has been disabled/i)).toBeInTheDocument();
 });
 
 test('calls login API with entered credentials', async () => {

@@ -52,7 +52,14 @@ function Register() {
       }
     } catch (err) {
       const data = err.response?.data;
-      if (data) {
+      if (data?.error?.details) {
+        // Custom error envelope: { error: { status_code, message, details } }
+        const messages = Object.values(data.error.details).flat().join(' ');
+        setError(messages);
+      } else if (data?.error?.message) {
+        setError(data.error.message);
+      } else if (data) {
+        // Fallback: plain DRF format { field: [errors] }
         const messages = Object.values(data).flat().join(' ');
         setError(messages);
       } else {
